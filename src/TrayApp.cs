@@ -7,6 +7,7 @@ public sealed class TrayApp : ApplicationContext
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run", RunValue = "BatteryTray";
     private const string TrayKey = @"Control Panel\NotifyIconSettings";
+    private const string ApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30), SleepGrace = TimeSpan.FromMinutes(2);
 
     private sealed class Item(IBatterySource source, NotifyIcon icon)
@@ -158,14 +159,30 @@ public sealed class TrayApp : ApplicationContext
 
     private static bool IsAutostart()
     {
-        using RegistryKey? k = Registry.CurrentUser.OpenSubKey(RunKey);
-        return k?.GetValue(RunValue) is string;
+        using RegistryKey? run = Registry.CurrentUser.OpenSubKey(RunKey);
+        using RegistryKey? approved = Registry.CurrentUser.OpenSubKey(ApprovedKey);
+        // Task Manager marks a disabled entry with an odd first byte (03).
+        return run?.GetValue(RunValue) is string
+            && !(approved?.GetValue(RunValue) is byte[] { Length: > 0 } flags && (flags[0] & 1) == 1);
     }
 
+    /// <summary>
+    /// Writes the Run value and the StartupApproved flag. Explorer on this Windows build
+    /// (26300) skips Run entries that have no StartupApproved flag.
+    /// </summary>
     private static void SetAutostart(bool on)
     {
-        using RegistryKey k = Registry.CurrentUser.CreateSubKey(RunKey);
-        if (on) k.SetValue(RunValue, $"\"{Environment.ProcessPath}\"");
-        else k.DeleteValue(RunValue, false);
+        using RegistryKey run = Registry.CurrentUser.CreateSubKey(RunKey);
+        using RegistryKey approved = Registry.CurrentUser.CreateSubKey(ApprovedKey);
+        if (on)
+        {
+            run.SetValue(RunValue, $"\"{Environment.ProcessPath}\"");
+            approved.SetValue(RunValue, new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, RegistryValueKind.Binary);
+        }
+        else
+        {
+            run.DeleteValue(RunValue, false);
+            approved.DeleteValue(RunValue, false);
+        }
     }
 }
