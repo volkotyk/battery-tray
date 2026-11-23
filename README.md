@@ -34,6 +34,16 @@ The Arctis request comes from [HeadsetControl](https://github.com/Sapd/HeadsetCo
 The Razer report layout comes from [openrazer](https://github.com/openrazer/openrazer).
 The Arctis power byte was found on real hardware and is not in HeadsetControl.
 
+## Download
+
+[Releases](https://github.com/volkotyk/battery-tray/releases) have two exes:
+`BatteryTray-selfcontained.exe` runs without .NET, `BatteryTray.exe` needs the .NET 8 Desktop Runtime.
+GitHub Actions builds both and signs their build provenance. Check a file with:
+
+```powershell
+gh attestation verify BatteryTray-selfcontained.exe --repo volkotyk/battery-tray
+```
+
 ## Build
 
 Requires the .NET 8 SDK on Windows.
