@@ -44,9 +44,10 @@ jobs:
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item out/fd/BatteryTray.exe dist/BatteryTray.exe
           Copy-Item out/sc/BatteryTray.exe dist/BatteryTray-selfcontained.exe
-          Get-FileHash dist/*.exe -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
-            Set-Content dist/SHA256SUMS.txt
+          # LF line endings, so that `sha256sum -c SHA256SUMS.txt` works.
+          $sums = Get-FileHash dist/*.exe -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)`n" }
+          [IO.File]::WriteAllText("$PWD/dist/SHA256SUMS.txt", -join $sums)
 
       - uses: actions/attest@v4
         with:
