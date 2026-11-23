@@ -1,0 +1,62 @@
+name: Release
+
+# Builds both exes on GitHub, signs their build provenance with Sigstore
+# (verify: gh attestation verify <file> --repo volkotyk/battery-tray) and uploads them to the release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload to (created if missing)
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build framework-dependent exe
+        run: dotnet publish src/BatteryTray.csproj -c Release -o out/fd
+
+      - name: Build self-contained exe
+        run: >-
+          dotnet publish src/BatteryTray.csproj -c Release -o out/sc --self-contained true
+          -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
+
+      - name: Collect files and checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item out/fd/BatteryTray.exe dist/BatteryTray.exe
+          Copy-Item out/sc/BatteryTray.exe dist/BatteryTray-selfcontained.exe
+          Get-FileHash dist/*.exe -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content dist/SHA256SUMS.txt
+
+      - uses: actions/attest@v4
+        with:
+          subject-path: dist/*.exe
+
+      - name: Upload to the release
+        shell: pwsh
+        run: |
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:TAG --title "BatteryTray $($env:TAG.TrimStart('v'))" --generate-notes
+          }
+          gh release upload $env:TAG dist/BatteryTray.exe dist/BatteryTray-selfcontained.exe dist/SHA256SUMS.txt --clobber
