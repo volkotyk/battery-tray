@@ -167,8 +167,8 @@ public sealed class TrayApp : ApplicationContext
     }
 
     /// <summary>
-    /// Writes the Run value and the StartupApproved flag. Explorer on this Windows build
-    /// (26300) skips Run entries that have no StartupApproved flag.
+    /// Writes the Run value and the StartupApproved flag, as Task Manager does when it enables an entry,
+    /// so that an entry disabled in Task Manager becomes active again.
     /// </summary>
     private static void SetAutostart(bool on)
     {
@@ -184,5 +184,6 @@ public sealed class TrayApp : ApplicationContext
             run.DeleteValue(RunValue, false);
             approved.DeleteValue(RunValue, false);
         }
+        Log.App($"autostart {(on ? "on" : "off")}");
     }
 }
